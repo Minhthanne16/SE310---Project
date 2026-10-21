@@ -1,84 +1,44 @@
 using Backend.Application.Common;
 using Backend.Application.DTOs.Product;
-using Backend.Application.Interfaces;
+using Backend.Application.Products;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ProductsController : ControllerBase
+public sealed class ProductsController(ISender sender) : ControllerBase
 {
-    private readonly IProductService _productService;
-
-    public ProductsController(IProductService productService)
-    {
-        _productService = productService;
-    }
-
-    /// <summary>
-    /// Lấy danh sách tất cả sản phẩm
-    /// </summary>
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ProductDto>>>> GetAll()
-    {
-        var result = await _productService.GetAllProductsAsync();
-        return Ok(result);
-    }
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ProductDto>>>> GetAll(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetProductsQuery(), cancellationToken));
 
-    /// <summary>
-    /// Lấy chi tiết sản phẩm theo Id
-    /// </summary>
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<ProductDto>>> GetById(Guid id)
+    public async Task<ActionResult<ApiResponse<ProductDto>>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _productService.GetProductByIdAsync(id);
-        if (!result.Success)
-        {
-            return NotFound(result);
-        }
-        return Ok(result);
+        var result = await sender.Send(new GetProductQuery(id), cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
     }
 
-    /// <summary>
-    /// Tạo mới một sản phẩm
-    /// </summary>
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<ProductDto>>> Create([FromBody] CreateProductDto dto)
+    public async Task<ActionResult<ApiResponse<ProductDto>>> Create(CreateProductDto dto, CancellationToken cancellationToken)
     {
-        var result = await _productService.CreateProductAsync(dto);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
+        var result = await sender.Send(new CreateProductCommand(dto), cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result);
     }
 
-    /// <summary>
-    /// Cập nhật thông tin sản phẩm
-    /// </summary>
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<ProductDto>>> Update(Guid id, [FromBody] UpdateProductDto dto)
+    public async Task<ActionResult<ApiResponse<ProductDto>>> Update(Guid id, UpdateProductDto dto, CancellationToken cancellationToken)
     {
-        var result = await _productService.UpdateProductAsync(id, dto);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-        return Ok(result);
+        var result = await sender.Send(new UpdateProductCommand(id, dto), cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
     }
 
-    /// <summary>
-    /// Xóa một sản phẩm theo Id
-    /// </summary>
     [HttpDelete("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<bool>>> Delete(Guid id)
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _productService.DeleteProductAsync(id);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-        return Ok(result);
+        var result = await sender.Send(new DeleteProductCommand(id), cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
     }
 }

@@ -2,56 +2,70 @@ using Backend.API.Middlewares;
 using Backend.Application;
 using Backend.Infrastructure;
 using Backend.Infrastructure.Data;
+using Scalar.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Cấu hình CORS để Frontend (React/Vite) gọi API dễ dàng
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
-
-// 2. Đăng ký Services của các tầng Clean Architecture
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
-
-// 3. Đăng ký Controllers & Swagger
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddOpenApi();
+var jwtKey = builder.Configuration["Authentication:Jwt:SigningKey"];
+var authentication = string.IsNullOrWhiteSpace(jwtKey)
+    ? builder.Services.AddAuthentication()
+    : builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme);
+if (!string.IsNullOrWhiteSpace(jwtKey))
 {
-    c.SwaggerDoc("v1", new() { Title = "SE310 API", Version = "v1", Description = "Backend API cho dự án môn SE310" });
-});
+    if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+        throw new InvalidOperationException("JWT signing key must be at least 32 bytes.");
+    authentication.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Authentication:Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Authentication:Jwt:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+}
+builder.Services.AddAuthorization();
+builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
+    .WithOrigins(builder.Configuration["FrontendOrigin"] ?? "http://localhost:3000")
+    .AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
 
-// 4. Seed dữ liệu mẫu khi ứng dụng khởi chạy
-await DataSeeder.SeedAsync(app.Services);
-
-// 5. Middleware xử lý lỗi tập trung (Global Exception Handling)
 app.UseMiddleware<GlobalExceptionMiddleware>();
-
-// 6. Cấu hình HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "SE310 API v1");
-    });
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
-
-app.UseCors("AllowFrontend");
-
+app.UseCors("Frontend");
+app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+if (app.Configuration.GetValue<bool>("InitializeDatabase"))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+}
+if (app.Configuration.GetValue<bool>("SeedSampleProducts"))
+{
+    await DataSeeder.SeedAsync(app.Services);
+}
 
 app.Run();
 
+public partial class Program { }

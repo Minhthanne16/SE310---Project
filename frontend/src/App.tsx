@@ -1,10 +1,23 @@
+'use client';
+
 import React, { useState, useEffect, useMemo } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { Header } from '@/components/common/Header';
 import { ProductCard } from '@/features/products/components/ProductCard';
 import { ProductFormModal } from '@/features/products/components/ProductFormModal';
 import { productService } from '@/features/products/services/productService';
-import type { Product, CreateProductDto, UpdateProductDto } from '@/types/product';
-import { Plus, Search, RefreshCw, AlertCircle, ShoppingBag } from 'lucide-react';
+import type {
+  Product,
+  CreateProductDto,
+  UpdateProductDto,
+} from '@/types/product';
+import {
+  Plus,
+  Search,
+  RefreshCw,
+  AlertCircle,
+  ShoppingBag,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,7 +35,9 @@ export const App: React.FC = () => {
       const data = await productService.getAll();
       setProducts(data);
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Lỗi kết nối Backend');
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Lỗi kết nối Backend',
+      );
     } finally {
       setLoading(false);
     }
@@ -34,7 +49,11 @@ export const App: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term));
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        p.description.toLowerCase().includes(term),
+    );
   }, [products, searchTerm]);
 
   const handleDelete = async (id: string) => {
@@ -44,41 +63,72 @@ export const App: React.FC = () => {
       await productService.delete(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Xóa thất bại');
+      toast.error(err instanceof Error ? err.message : 'Xóa thất bại');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleFormSubmit = async (data: CreateProductDto | UpdateProductDto) => {
+  const handleFormSubmit = async (
+    data: CreateProductDto | UpdateProductDto,
+  ) => {
     try {
       setActionLoading(true);
       if (editingProduct) {
-        const res = await productService.update(editingProduct.id, data as UpdateProductDto);
+        const res = await productService.update(
+          editingProduct.id,
+          data as UpdateProductDto,
+        );
         setProducts((prev) => prev.map((p) => (p.id === res.id ? res : p)));
       } else {
         const res = await productService.create(data as CreateProductDto);
         setProducts((prev) => [res, ...prev]);
       }
+      toast.success('Đã lưu sản phẩm');
     } finally {
       setActionLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
+    >
       <Header />
       <main className="container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Danh Sách Sản Phẩm</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>RESTful API từ ASP.NET Core 9 Clean Architecture</p>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>
+              Danh Sách Sản Phẩm
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              REST API từ ASP.NET Core 10
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={fetchProducts} className="btn btn-outline" disabled={loading}>
+            <button
+              onClick={fetchProducts}
+              className="btn btn-outline"
+              disabled={loading}
+            >
               <RefreshCw size={15} /> Tải lại
             </button>
-            <button onClick={() => { setEditingProduct(null); setIsModalOpen(true); }} className="btn btn-primary">
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setIsModalOpen(true);
+              }}
+              className="btn btn-primary"
+            >
               <Plus size={16} /> Thêm sản phẩm
             </button>
           </div>
@@ -99,16 +149,30 @@ export const App: React.FC = () => {
             <AlertCircle size={20} />
             <div>
               <strong>Lỗi kết nối:</strong> {errorMessage}
-              <div style={{ fontSize: '0.8rem' }}>Backend cần chạy ở http://localhost:5290</div>
+              <div style={{ fontSize: '0.8rem' }}>
+                Backend cần chạy ở http://localhost:5290
+              </div>
             </div>
           </div>
         )}
 
         {loading ? (
-          <p style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>Đang nạp dữ liệu...</p>
+          <p
+            style={{
+              textAlign: 'center',
+              padding: '40px 0',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            Đang nạp dữ liệu...
+          </p>
         ) : filteredProducts.length === 0 ? (
           <div className="empty-state">
-            <ShoppingBag size={36} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+            <ShoppingBag
+              size={36}
+              color="var(--text-muted)"
+              style={{ margin: '0 auto 12px' }}
+            />
             <p>Không tìm thấy sản phẩm nào.</p>
           </div>
         ) : (
@@ -117,7 +181,10 @@ export const App: React.FC = () => {
               <ProductCard
                 key={p.id}
                 product={p}
-                onEdit={(item) => { setEditingProduct(item); setIsModalOpen(true); }}
+                onEdit={(item) => {
+                  setEditingProduct(item);
+                  setIsModalOpen(true);
+                }}
                 onDelete={handleDelete}
               />
             ))}
@@ -125,8 +192,16 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      <footer style={{ textAlign: 'center', padding: 20, borderTop: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-        SE310 Project - Clean Architecture (.NET 9) + React 19 (TypeScript)
+      <footer
+        style={{
+          textAlign: 'center',
+          padding: 20,
+          borderTop: '1px solid var(--border)',
+          fontSize: '0.85rem',
+          color: 'var(--text-muted)',
+        }}
+      >
+        SE310 Project - Clean Architecture (.NET 10) + Next.js 16
       </footer>
 
       <ProductFormModal
@@ -136,6 +211,7 @@ export const App: React.FC = () => {
         initialData={editingProduct}
         loading={actionLoading}
       />
+      <Toaster position="top-right" />
     </div>
   );
 };

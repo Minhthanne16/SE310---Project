@@ -1,30 +1,34 @@
-import { apiClient } from '@/api/client';
-import type { ApiResponse } from '@/types/api';
-import type { Product, CreateProductDto, UpdateProductDto } from '@/types/product';
+import { apiRequest } from '@/api/request';
+import type {
+  Product,
+  CreateProductDto,
+  UpdateProductDto,
+} from '@/types/product';
 
 export const productService = {
   async getAll(): Promise<Product[]> {
-    const res = await apiClient.get<ApiResponse<Product[]>>('/products');
-    return res.data.data;
+    return apiRequest<Product[]>('/products');
   },
 
   async getById(id: string): Promise<Product> {
-    const res = await apiClient.get<ApiResponse<Product>>(`/products/${id}`);
-    return res.data.data;
+    return apiRequest<Product>(`/products/${id}`);
   },
 
   async create(data: CreateProductDto): Promise<Product> {
-    const res = await apiClient.post<ApiResponse<Product>>('/products', data);
-    return res.data.data;
+    return apiRequest<Product>('/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async update(id: string, data: UpdateProductDto): Promise<Product> {
-    const res = await apiClient.put<ApiResponse<Product>>(`/products/${id}`, data);
-    return res.data.data;
+    return apiRequest<Product>(`/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   async delete(id: string): Promise<boolean> {
-    const res = await apiClient.delete<ApiResponse<boolean>>(`/products/${id}`);
-    return res.data.data;
+    return apiRequest<boolean>(`/products/${id}`, { method: 'DELETE' });
   },
 };

@@ -1,109 +1,91 @@
-# SE310 Project - React (TypeScript) & ASP.NET Core 9 Web API
+# SE310 Project
 
-Repository mẫu hoàn chỉnh gồm Frontend (React + TypeScript) và Backend (.NET 9 C#) được phân tách thành 2 thư mục riêng biệt, tuân thủ các chuẩn kiến trúc phần mềm hiện đại và thực tế trong doanh nghiệp.
+Ứng dụng quản lý sản phẩm mẫu với Next.js 16 và ASP.NET Core 10. Frontend và backend nằm trong hai thư mục riêng, kết nối qua `/api` của Next.js.
 
----
+## Tech stack
 
-## 🏛️ Kiến Trúc Được Áp Dụng
+| Phần | Công nghệ |
+| --- | --- |
+| Frontend | Node.js 24, Next.js 16.4.0 App Router, React 19.3.0, TypeScript 5.9.3 strict mode |
+| UI | Tailwind CSS 4.3.3, React Hot Toast, Lucide React |
+| FE testing/tooling | Vitest 5.0.3, Testing Library, jsdom, Oxlint 1.87.0, Prettier 3.9.9, Turbopack |
+| Backend | ASP.NET Core Web API, .NET 10, Clean Architecture, CQRS/MediatR 14.2.0, Repository |
+| Validation/mapping | FluentValidation 12.1.1, AutoMapper 16.2.0 |
+| Data | PostgreSQL hoặc Neon, EF Core 10.0.12, Npgsql 10.0.3 |
+| Integrations | Redis 8/StackExchange.Redis, MinIO, JWT Bearer, BCrypt, Google Identity SDK, SMTP/MailKit |
+| API/tests | OpenAPI + Scalar, xUnit, ASP.NET Core TestHost, coverlet |
+| Delivery | Docker multi-stage, Docker Compose, GHCR workflow, GitHub Actions, npm audit, Gitleaks |
 
-### 1. Backend: Clean Architecture (Onion / Hexagonal Architecture)
-Dự án Backend được chia thành 4 tầng theo nguyên lý **Dependency Inversion** (mũi tên phụ thuộc hướng vào trung tâm):
-
-```
-       ┌────────────────────────┐
-       │   Presentation (API)   │  Controllers, Middlewares, Program.cs
-       └───────────┬────────────┘
-                   │
-       ┌───────────▼────────────┐
-       │      Application       │  Use Cases, Services, DTOs, Business Logic
-       └───────────┬────────────┘
-                   │
-       ┌───────────▼────────────┐
-       │         Domain         │  Entities, Interfaces, Enums (Không phụ thuộc tầng khác)
-       └────────────────────────┘
-                   ▲
-       ┌───────────┴────────────┐
-       │     Infrastructure     │  EF Core DbContext, Repositories, Database Providers
-       └────────────────────────┘
-```
-
-- **Domain (`Backend.Domain`)**: Trung tâm cốt lõi của nghiệp vụ, chứa các Entity (`Product`, `BaseEntity`) và Interface nghiệp vụ (`IProductRepository`). Không phụ thuộc vào bất kỳ thư viện bên ngoài hay cơ sở dữ liệu nào.
-- **Application (`Backend.Application`)**: Chứa logic xử lý nghiệp vụ (`ProductService`), DTOs (`ProductDto`, `CreateProductDto`), chuẩn hóa phản hồi (`ApiResponse<T>`).
-- **Infrastructure (`Backend.Infrastructure`)**: Triển khai chi tiết tầng kỹ thuật, cấu hình Entity Framework Core (`ApplicationDbContext`), Seed dữ liệu (`DataSeeder`), và Repositories (`ProductRepository`). Sử dụng In-Memory DB (sẵn sàng chuyển đổi sang SQL Server/PostgreSQL).
-- **API (`Backend.API`)**: Điểm vào của ứng dụng (RESTful Controllers), xử lý HTTP requests/responses, Global Exception Handling Middleware, CORS và Swagger OpenApi documentation.
-
----
-
-### 2. Frontend: Feature-based Architecture (Kiến trúc theo tính năng)
-Frontend sử dụng Vite + React 19 + TypeScript, cấu trúc theo từng module tính năng (Features):
-
-```
-frontend/src/
-├── api/                  # Axios HTTP client cấu hình tập trung & Interceptors
-├── components/common/    # Component giao diện dùng chung (Header, Modal, Buttons)
-├── features/             # Chia thư mục theo từng nghiệp vụ/tính năng
-│   └── products/
-│       ├── components/   # ProductCard, ProductFormModal
-│       └── services/     # Product API Service
-├── types/                # TypeScript Interfaces, Models, API Responses
-├── App.tsx               # Component chính điều phối view
-├── main.tsx              # Entry point của ứng dụng
-└── index.css             # Design tokens, CSS variables & utilities
-```
-
----
-
-## 📂 Cấu Trúc Thư Mục Repository
+## Cấu trúc
 
 ```text
-SE310-Project/
-├── backend/
-│   ├── Backend.sln
-│   └── src/
-│       ├── Backend.Domain/
-│       ├── Backend.Application/
-│       ├── Backend.Infrastructure/
-│       └── Backend.API/
-├── frontend/
-│   ├── src/
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── .gitignore
-└── README.md
+frontend/
+  app/                         Next.js App Router
+  src/features/products/       Giao diện và client cho sản phẩm
+  src/api/                     HTTP client qua Next.js proxy
+  Dockerfile
+backend/
+  src/Backend.Domain/         Entity và repository contract
+  src/Backend.Application/    CQRS handlers, validation, mapping
+  src/Backend.Infrastructure/ EF Core, PostgreSQL migration, Redis/MinIO/SMTP adapters
+  src/Backend.API/            HTTP controllers, OpenAPI/Scalar, JWT config
+  tests/Backend.Tests/        xUnit và TestHost
+  Dockerfile
+compose.yaml
+.github/workflows/             CI và publish GHCR theo lệnh thủ công
 ```
 
----
+CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Tích hợp Redis, MinIO, SMTP, JWT/Google và BCrypt đã có package, cấu hình và adapter cơ bản; repo **chưa có** endpoint đăng nhập, refresh-token rotation, gửi email hoặc upload file. Các luồng đó cần được xây khi có yêu cầu nghiệp vụ cụ thể.
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy Ứng Dụng
+## Chạy bằng Docker Compose
 
-### 1. Khởi chạy Backend (.NET 9)
-```bash
+1. Sao chép `.env.example` thành `.env` rồi thay các giá trị mật khẩu mẫu. `.env` được git bỏ qua.
+2. Chạy `docker compose up --build` tại thư mục gốc.
+3. Mở frontend tại <http://localhost:3000>, API tại <http://localhost:5290>, Scalar tại <http://localhost:5290/scalar> và MinIO Console tại <http://localhost:9001>.
+
+Compose tự chạy migration và seed ba sản phẩm mẫu. Volume PostgreSQL, Redis và MinIO giữ dữ liệu giữa các lần khởi động.
+
+### Dùng Neon thay PostgreSQL local
+
+Project Neon `se310-project` đã có migration khởi tạo. Đặt chuỗi kết nối pooled vào `ConnectionStrings__DefaultConnection` trong `.env` local (xem `.env.example`), rồi chạy `docker compose -f compose.neon.yaml up --build`. Cấu hình này không tự chạy migration hoặc seed. Xem [hướng dẫn Neon](docs/NEON.md) để lấy lại chuỗi kết nối, kiểm tra branch và chuyển dữ liệu nếu cần.
+
+MinIO trong Compose chỉ dành cho local development. Bản open-source này đã được lưu trữ và có [cảnh báo bảo mật từ dự án MinIO](https://github.com/minio/minio/security/advisories); các cổng trong Compose chỉ bind vào `127.0.0.1`. Khi triển khai thực tế, dùng dịch vụ MinIO được duy trì và quản lý riêng.
+
+## Chạy riêng để phát triển
+
+Yêu cầu Node.js 24, .NET SDK 10 và PostgreSQL. Khai báo biến môi trường `ConnectionStrings__DefaultConnection` cho API, ví dụ chuỗi kết nối tới PostgreSQL local. Với Neon, dùng chuỗi kết nối do Neon cấp qua biến môi trường; không ghi vào file được commit.
+
+```powershell
 cd backend
-dotnet restore
+dotnet restore Backend.sln --locked-mode
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project src/Backend.Infrastructure --startup-project src/Backend.API
 dotnet run --project src/Backend.API
 ```
-- API Base URL: `http://localhost:5290`
-- Swagger UI (tài liệu API trực quan): `http://localhost:5290/swagger`
 
-### 2. Khởi chạy Frontend (React + TypeScript)
-Mở một cửa sổ Terminal mới:
-```bash
+Ở terminal khác:
+
+```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
-- Frontend Web App: `http://localhost:5173`
 
----
+`frontend/next.config.ts` chuyển `/api/*` đến `http://localhost:5290` khi chạy local. Có thể đặt `API_INTERNAL_URL` nếu API ở địa chỉ khác. Đặt `InitializeDatabase=true` để API tự chạy migration khi khởi động.
 
-## 🔌 API Endpoints Mẫu (Products)
+## Kiểm tra
 
-| Method | Endpoint | Mô tả |
-| :--- | :--- | :--- |
-| `GET` | `/api/products` | Lấy danh sách sản phẩm |
-| `GET` | `/api/products/{id}` | Lấy chi tiết sản phẩm theo ID |
-| `POST` | `/api/products` | Thêm mới sản phẩm |
-| `PUT` | `/api/products/{id}` | Cập nhật thông tin sản phẩm |
-| `DELETE` | `/api/products/{id}` | Xóa sản phẩm theo ID |
+```powershell
+cd backend
+dotnet restore Backend.sln --locked-mode
+dotnet test Backend.sln --no-restore
+
+cd ../frontend
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm audit --audit-level=high
+```
+
+CI dùng `npm ci`, NuGet lockfile, build/test cả hai phần và Gitleaks. Workflow GHCR chỉ chạy khi được kích hoạt thủ công (`workflow_dispatch`).

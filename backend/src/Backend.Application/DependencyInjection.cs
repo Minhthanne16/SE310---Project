@@ -1,5 +1,6 @@
-using Backend.Application.Interfaces;
-using Backend.Application.Services;
+using Backend.Application.Products;
+using FluentValidation;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.Application;
@@ -8,7 +9,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-        services.AddScoped<IProductService, ProductService>();
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(GetProductsQuery).Assembly));
+        services.AddValidatorsFromAssemblyContaining<CreateProductValidator>();
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddAutoMapper(cfg => {}, typeof(ProductProfile).Assembly);
         return services;
     }
 }

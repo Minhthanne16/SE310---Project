@@ -45,3 +45,12 @@ yarn-error.log*
 # Vite and TypeScript temporary files
 *.tsbuildinfo
 .tmp/
+.next/
+coverage/
+TestResults/
+*.pem
+*.key
+backend/.dotnet/
+backend/.nuget/
+.neon
+.env.neon
