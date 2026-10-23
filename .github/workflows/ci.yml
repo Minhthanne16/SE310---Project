@@ -7,15 +7,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -29,21 +34,30 @@ jobs:
       - run: npm audit --audit-level=high
 
   backend:
+    name: Backend CI
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet restore backend/Backend.sln --locked-mode
-      - run: dotnet test backend/Backend.sln --no-restore --configuration Release --collect:"XPlat Code Coverage"
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
+      - run: dotnet restore Backend.sln --locked-mode
+      - run: dotnet build Backend.sln --no-restore --configuration Release
+      - run: dotnet test Backend.sln --no-build --configuration Release
 
   secrets:
+    name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
