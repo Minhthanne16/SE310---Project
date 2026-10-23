@@ -1,5 +1,12 @@
 # Hướng dẫn cho agent làm việc trong SE310-Project
 
+## Bắt buộc đọc tài liệu trước khi code
+
+- Trước khi viết, sửa, đánh giá hoặc đề xuất thay đổi **code** trong repository, phải đọc toàn bộ tệp trong `docs/` theo cách đệ quy. Bắt đầu tại `docs/CONTENT.md`, sau đó đọc tất cả tài liệu Markdown/text và mở kiểm tra tài nguyên hình ảnh hỗ trợ trong `docs/`.
+- `docs/` là nguồn chuẩn của sản phẩm QLKLTN. Mã nguồn mẫu hiện có, tên file, route, giao diện mẫu hoặc dữ liệu giả không được dùng để suy diễn yêu cầu chưa được tài liệu xác nhận.
+- Đọc `docs/OPEN_QUESTIONS.md` trước khi code phần liên quan. Nếu còn câu hỏi mở hoặc tài liệu nghiệp vụ và `docs/DESIGN/` mâu thuẫn, dừng việc code để làm rõ/ghi nhận quyết định; không tự chọn một quy tắc.
+- Khi thay đổi làm ảnh hưởng yêu cầu, quy tắc, vai trò, mô hình miền hoặc quyết định đã chốt, cập nhật tài liệu liên quan trong cùng tác vụ trước khi xem thay đổi mã là hoàn thành.
+
 ## Phạm vi và cấu trúc
 
 - File này áp dụng cho toàn bộ repository. Đọc `README.md` và file liên quan trước khi sửa.
