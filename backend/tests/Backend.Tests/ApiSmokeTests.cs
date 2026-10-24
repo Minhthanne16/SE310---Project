@@ -20,6 +20,7 @@ public sealed class ApiSmokeTests : IClassFixture<ApiSmokeTests.ApiFactory>
         var document = await response.Content.ReadAsStringAsync();
         Assert.Contains("/api/Products", document);
         Assert.Contains("/api/Auth/login", document);
+        Assert.Contains("/api/Users/import", document);
     }
 
     [Fact]

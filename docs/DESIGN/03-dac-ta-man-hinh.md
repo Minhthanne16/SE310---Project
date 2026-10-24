@@ -545,7 +545,7 @@ Quy ước chung: trạng thái đề tài là Chờ GV duyệt, Đã đăng ký
 
 - Lọc vai trò, trạng thái, tìm kiếm.
 - Form dạng ngăn kéo theo vai trò: SV có lớp; GV có bộ môn, học hàm. Lỗi: thiếu thông tin, trùng mã, trùng email.
-- Nhập CSV hai bước (chọn tệp, xem trước), cột: user_code, full_name, email, role, date_of_birth, class_name, department, academic_title; bỏ dòng lỗi, tải báo cáo lỗi; lỗi tệp không phải CSV.
+- Nhập CSV hai bước (chọn tệp, xem trước), cột: user_code, full_name, email, role, date_of_birth, class_name, department, academic_title; bỏ dòng lỗi, tải báo cáo lỗi; lỗi tệp không phải CSV. Backend đã có (`/api/users/import/preview`, `/api/users/import`); quy tắc bắt buộc và giới hạn tệp xem [PDR-004](../decisions/PDR-004-nhap-tai-khoan-csv.md).
 - Đặt lại mật khẩu: về mã người dùng hoặc nhập mật khẩu mới.
 
 **Quy tắc nghiệp vụ**

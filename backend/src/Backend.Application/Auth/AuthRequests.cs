@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Backend.Application.Common;
 using Backend.Application.Common.Email;
 using Backend.Application.Common.Security;
@@ -62,7 +63,8 @@ public sealed class LoginHandler(IUserRepository users, IPasswordHasher hasher, 
     // Thiết kế màn Đăng nhập: một dòng lỗi chung, không nói ô nào sai.
     public const string InvalidCredentialsMessage = "Email hoặc mật khẩu không đúng. Kiểm tra lại hoặc dùng Quên mật khẩu.";
 
-    private static string? s_dummyHash;
+    // Hash giả theo từng loại hasher: hash của BCrypt không verify được bằng hasher khác.
+    private static readonly ConcurrentDictionary<Type, string> s_dummyHashes = new();
 
     public async Task<ApiResponse<AuthenticatedSession>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
@@ -70,8 +72,8 @@ public sealed class LoginHandler(IUserRepository users, IPasswordHasher hasher, 
         if (user is null)
         {
             // Vẫn băm để thời gian phản hồi không tiết lộ email có tồn tại hay không.
-            s_dummyHash ??= hasher.Hash(Guid.NewGuid().ToString());
-            hasher.Verify(request.Credentials.Password, s_dummyHash);
+            var dummyHash = s_dummyHashes.GetOrAdd(hasher.GetType(), _ => hasher.Hash(Guid.NewGuid().ToString()));
+            hasher.Verify(request.Credentials.Password, dummyHash);
             return ApiResponse<AuthenticatedSession>.Fail(InvalidCredentialsMessage);
         }
 

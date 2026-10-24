@@ -64,6 +64,10 @@ namespace Backend.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AcademicTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime?>("ActivationCodeExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -77,8 +81,19 @@ namespace Backend.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("ActivationCodeSentAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ClassName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Email")
                         .IsRequired()

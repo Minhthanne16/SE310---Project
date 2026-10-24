@@ -65,9 +65,13 @@ public static class DataSeeder
             MustChangePassword = true
         };
 
+        var student = Create("22520001", "Nguyễn Văn An", "sv.22520001@qlkltn.local", UserRole.Student);
+        student.ClassName = "KTPM2022";
+        var lecturer = Create("GV0001", "Trần Thị Bình", "gv.0001@qlkltn.local", UserRole.Lecturer);
+        lecturer.Department = "Công nghệ phần mềm";
         await context.Users.AddRangeAsync(
-            Create("22520001", "Nguyễn Văn An", "sv.22520001@qlkltn.local", UserRole.Student),
-            Create("GV0001", "Trần Thị Bình", "gv.0001@qlkltn.local", UserRole.Lecturer),
+            student,
+            lecturer,
             Create("GVU0001", "Lê Văn Cường", "giaovu.0001@qlkltn.local", UserRole.AcademicAffairs));
         await context.SaveChangesAsync();
     }
