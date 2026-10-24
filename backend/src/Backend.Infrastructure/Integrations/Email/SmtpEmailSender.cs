@@ -1,3 +1,4 @@
+using Backend.Application.Common.Email;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
@@ -20,7 +21,9 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSend
         message.Body = new TextPart("plain") { Text = text };
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.StartTls, cancellationToken);
+        // Gmail bắt buộc STARTTLS; chỉ tắt cho SMTP local như Mailpit.
+        var security = settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
+        await client.ConnectAsync(settings.Host, settings.Port, security, cancellationToken);
         if (!string.IsNullOrWhiteSpace(settings.Username))
             await client.AuthenticateAsync(settings.Username, settings.Password, cancellationToken);
         await client.SendAsync(message, cancellationToken);

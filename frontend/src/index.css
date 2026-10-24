@@ -338,6 +338,28 @@ textarea:focus {
   color: #174a94;
 }
 
+.login-link-button {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f5fbf;
+  min-height: 40px;
+}
+
+.login-link-button:hover:not(:disabled) {
+  color: #174a94;
+}
+
+.login-link-button:disabled {
+  color: #737373;
+  cursor: not-allowed;
+}
+
+.login-hint {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #5c5c5c;
+}
+
 .login-field input {
   height: 46px;
   padding: 0 14px;

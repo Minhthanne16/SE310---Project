@@ -14,7 +14,8 @@ docs/
 │   └── SYSTEM_CONTEXT.md
 ├── decisions/
 │   ├── PDR-001-vai-tro-va-quy-trinh-co-kiem-soat.md
-│   └── PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md
+│   ├── PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md
+│   └── PDR-003-otp-kich-hoat-qua-email.md
 ├── product/
 │   ├── GLOSSARY.md
 │   ├── ROLES.md

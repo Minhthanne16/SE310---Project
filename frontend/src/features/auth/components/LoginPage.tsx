@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Circle } from 'lucide-react';
@@ -27,10 +27,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [activationCode, setActivationCode] = useState('');
+  const [codeNotice, setCodeNotice] = useState<string | null>(null);
+  const [resendAt, setResendAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const finish = () => (onAuthenticated ? onAuthenticated() : router.push('/'));
+
+  const resendSeconds =
+    resendAt === null ? 0 : Math.max(0, Math.ceil((resendAt - now) / 1000));
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [resendSeconds]);
+
+  const sendCode = async () => {
+    try {
+      setError(null);
+      const sent = await authService.sendActivationCode();
+      setResendAt(new Date(sent.resendAvailableAt).getTime());
+      setNow(Date.now());
+      setCodeNotice(
+        `Đã gửi mã 6 chữ số tới ${email.trim()}. Mã có hiệu lực 10 phút.`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Không gửi được mã');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +72,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (result === 'mustChangePassword') {
         setNewPassword('');
         setConfirmPassword('');
+        setActivationCode('');
         setStep('changePassword');
+        void sendCode();
       } else {
         finish();
       }
@@ -58,14 +87,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const rules = getNewPasswordRules(newPassword, confirmPassword, password);
   const rulesPassed = rules.every((r) => r.passed);
+  const codeValid = /^[0-9]{6}$/.test(activationCode);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rulesPassed) return;
+    if (!rulesPassed || !codeValid) return;
     try {
       setLoading(true);
       setError(null);
-      await authService.changeInitialPassword(password, newPassword);
+      await authService.changeInitialPassword(
+        password,
+        newPassword,
+        activationCode,
+      );
       finish();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại');
@@ -82,6 +116,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
     setStep('login');
     setPassword('');
+    setCodeNotice(null);
+    setResendAt(null);
     setError(null);
   };
 
@@ -174,8 +210,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span className="login-badge">Lần đăng nhập đầu tiên</span>
               <h2>Đổi mật khẩu để tiếp tục</h2>
               <p>
-                Tài khoản {email} đang dùng mật khẩu ban đầu. Đặt mật khẩu mới
-                để vào hệ thống. Bước này không bỏ qua được.
+                Tài khoản {email} đang dùng mật khẩu ban đầu. Nhập mã xác thực
+                đã gửi tới email và đặt mật khẩu mới để vào hệ thống. Bước này
+                không bỏ qua được.
               </p>
             </div>
 
@@ -185,6 +222,40 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <span>{error}</span>
               </div>
             )}
+
+            <div className="login-field">
+              <div className="login-field-row">
+                <label htmlFor="activation-code">Mã xác thực</label>
+                <button
+                  type="button"
+                  className="login-link-button"
+                  onClick={sendCode}
+                  disabled={resendSeconds > 0}
+                  aria-label="Gửi lại mã"
+                >
+                  {resendSeconds > 0
+                    ? `Gửi lại mã (${resendSeconds}s)`
+                    : 'Gửi lại mã'}
+                </button>
+              </div>
+              <input
+                id="activation-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="6 chữ số"
+                value={activationCode}
+                aria-describedby={codeNotice ? 'activation-notice' : undefined}
+                onChange={(e) =>
+                  setActivationCode(e.target.value.replace(/[^0-9]/g, ''))
+                }
+              />
+              {codeNotice && (
+                <p id="activation-notice" role="status" className="login-hint">
+                  {codeNotice}
+                </p>
+              )}
+            </div>
 
             <div className="login-field">
               <label htmlFor="new-password">Mật khẩu mới</label>
@@ -219,7 +290,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <button
               type="submit"
               className="login-submit"
-              disabled={!rulesPassed || loading}
+              disabled={!rulesPassed || !codeValid || loading}
             >
               Đổi mật khẩu và tiếp tục
             </button>

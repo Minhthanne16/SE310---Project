@@ -35,7 +35,12 @@ compose.yaml
 .github/workflows/             CI và publish GHCR theo lệnh thủ công
 ```
 
-CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Đã có API đăng nhập cục bộ (`/api/auth/login`, `me`, `change-initial-password`, `logout`): JWT nằm trong cookie HttpOnly, phân quyền theo ba vai trò `Student`, `Lecturer`, `AcademicAffairs`, mật khẩu băm bằng BCrypt. Xem [PDR-002](docs/decisions/PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md). Redis, MinIO, SMTP và Google đã có package, cấu hình và adapter cơ bản; repo **chưa có** refresh token, gửi email hoặc upload file.
+CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Đã có API đăng nhập cục bộ (`/api/auth/login`, `me`, `activation-code`, `change-initial-password`, `logout`): JWT nằm trong cookie HttpOnly, phân quyền theo ba vai trò `Student`, `Lecturer`, `AcademicAffairs`, mật khẩu băm bằng BCrypt. Lần đăng nhập đầu yêu cầu OTP 6 số gửi qua email. Xem [PDR-002](docs/decisions/PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md) và [PDR-003](docs/decisions/PDR-003-otp-kich-hoat-qua-email.md). Redis, MinIO và Google đã có package, cấu hình và adapter cơ bản; repo **chưa có** refresh token, Quên mật khẩu hoặc upload file.
+
+### Gửi email (OTP)
+
+- **Mặc định khi dùng Compose:** mail đi vào Mailpit, xem tại <http://localhost:8025>. Không cần cấu hình gì thêm.
+- **Gửi thật qua Gmail:** bật xác minh 2 bước cho tài khoản Gmail, tạo App Password tại <https://myaccount.google.com/apppasswords>, rồi điền vào `.env`: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USE_STARTTLS=true`, `SMTP_USER=<gmail>`, `SMTP_PASSWORD=<App Password>`, `SMTP_FROM=QLKLTN <gmail>`. Không dùng mật khẩu Gmail thật và không commit `.env`. Khi chạy `dotnet run`, dùng các biến `Email__Host`, `Email__Port`, `Email__UseStartTls`, `Email__Username`, `Email__Password`, `Email__From`.
 
 API bắt buộc có `Authentication__Jwt__SigningKey` (tối thiểu 32 byte, ví dụ `openssl rand -base64 48`), nếu thiếu sẽ không khởi động. Với Compose, đặt `JWT_SIGNING_KEY` trong `.env`.
 
@@ -43,9 +48,9 @@ API bắt buộc có `Authentication__Jwt__SigningKey` (tối thiểu 32 byte, v
 
 1. Sao chép `.env.example` thành `.env` rồi thay các giá trị mật khẩu mẫu. `.env` được git bỏ qua.
 2. Chạy `docker compose up --build` tại thư mục gốc.
-3. Mở frontend tại <http://localhost:3000>, API tại <http://localhost:5290>, Scalar tại <http://localhost:5290/scalar> và MinIO Console tại <http://localhost:9001>.
+3. Mở frontend tại <http://localhost:3000>, API tại <http://localhost:5290>, Scalar tại <http://localhost:5290/scalar>, MinIO Console tại <http://localhost:9001> và hộp thư Mailpit tại <http://localhost:8025>.
 
-Compose tự chạy migration, seed ba sản phẩm mẫu và ba tài khoản thử. Mật khẩu ban đầu của mỗi tài khoản là mã người dùng, phải đổi ở lần đăng nhập đầu: `sv.22520001@qlkltn.local` (22520001, Sinh viên), `gv.0001@qlkltn.local` (GV0001, Giảng viên), `giaovu.0001@qlkltn.local` (GVU0001, Giáo vụ). Volume PostgreSQL, Redis và MinIO giữ dữ liệu giữa các lần khởi động.
+Compose tự chạy migration, seed ba sản phẩm mẫu và ba tài khoản thử. Mật khẩu ban đầu của mỗi tài khoản là mã người dùng, phải đổi ở lần đăng nhập đầu bằng OTP gửi vào Mailpit: `sv.22520001@qlkltn.local` (22520001, Sinh viên), `gv.0001@qlkltn.local` (GV0001, Giảng viên), `giaovu.0001@qlkltn.local` (GVU0001, Giáo vụ). Volume PostgreSQL, Redis và MinIO giữ dữ liệu giữa các lần khởi động.
 
 ### Dùng Neon thay PostgreSQL local
 

@@ -53,11 +53,13 @@ Quy ước chung: trạng thái đề tài là Chờ GV duyệt, Đã đăng ký
 
 - Sai email hoặc mật khẩu: một dòng lỗi chung, không nói ô nào sai.
 - Lần đăng nhập đầu: bắt buộc đổi mật khẩu trước khi vào hệ thống.
+- Màn đổi mật khẩu lần đầu tự gửi mã xác thực 6 chữ số tới email của tài khoản; có ô "Mã xác thực" và nút "Gửi lại mã" đếm ngược 60 giây. Nút đổi mật khẩu chỉ bật khi mật khẩu đạt quy tắc và mã đủ 6 số. *(Bổ sung theo PDR-003, chưa có trên canvas.)*
 - Liên kết "Quên mật khẩu" sang màn riêng.
 
 **Quy tắc nghiệp vụ**
 
 - Mật khẩu mới theo `passwordRules` đã có trong repo.
+- Mã xác thực có hiệu lực 10 phút, dùng một lần, sai 5 lần thì bị hủy (xem [PDR-003](../decisions/PDR-003-otp-kich-hoat-qua-email.md)).
 
 ## Quên mật khẩu
 - **Vai trò:** Chung

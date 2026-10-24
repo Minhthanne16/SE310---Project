@@ -35,6 +35,12 @@ services:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
 
+  mailpit:
+    # Hộp thư giả cho local development: nhận mọi email, không gửi ra Internet.
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "127.0.0.1:8025:8025"
+
   api:
     build:
       context: .
@@ -51,11 +57,13 @@ services:
       Authentication__Jwt__Issuer: se310-api
       Authentication__Jwt__Audience: se310-web
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
-      Email__Host: ${SMTP_HOST:-}
-      Email__Port: ${SMTP_PORT:-587}
+      # Mặc định gửi vào Mailpit (xem thư tại http://localhost:8025). Đặt SMTP_* trong .env để gửi qua Gmail.
+      Email__Host: ${SMTP_HOST:-mailpit}
+      Email__Port: ${SMTP_PORT:-1025}
+      Email__UseStartTls: ${SMTP_USE_STARTTLS:-false}
       Email__Username: ${SMTP_USER:-}
       Email__Password: ${SMTP_PASSWORD:-}
-      Email__From: ${SMTP_FROM:-}
+      Email__From: ${SMTP_FROM:-QLKLTN <no-reply@qlkltn.local>}
       FrontendOrigin: http://localhost:3000
       InitializeDatabase: "true"
       SeedSampleProducts: "true"
@@ -63,6 +71,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     ports:
       - "127.0.0.1:5290:8080"
 

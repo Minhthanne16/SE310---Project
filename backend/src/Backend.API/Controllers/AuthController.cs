@@ -23,6 +23,20 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return Ok(ApiResponse<CurrentUserDto>.Ok(result.Data.User, result.Message));
     }
 
+    [HttpPost("activation-code")]
+    [Authorize(Policy = AuthPolicies.AllowPendingPasswordChange)]
+    public async Task<ActionResult<ApiResponse<ActivationCodeSentDto>>> SendActivationCode(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new SendActivationCodeCommand(CurrentUserId), cancellationToken);
+        return result.Status switch
+        {
+            SendActivationCodeStatus.Sent => Ok(result.Response),
+            SendActivationCodeStatus.TooSoon => StatusCode(StatusCodes.Status429TooManyRequests, result.Response),
+            SendActivationCodeStatus.DeliveryFailed => StatusCode(StatusCodes.Status503ServiceUnavailable, result.Response),
+            _ => BadRequest(result.Response)
+        };
+    }
+
     [HttpPost("change-initial-password")]
     [Authorize(Policy = AuthPolicies.AllowPendingPasswordChange)]
     public async Task<ActionResult<ApiResponse<CurrentUserDto>>> ChangeInitialPassword(ChangeInitialPasswordDto dto, CancellationToken cancellationToken)

@@ -76,7 +76,7 @@ it('sends the current and new password when changing the initial password', asyn
     body: { success: true, message: '', data: user(false) },
   });
 
-  await authService.changeInitialPassword('22520001', 'matkhau123');
+  await authService.changeInitialPassword('22520001', 'matkhau123', '123456');
 
   expect(fetchMock).toHaveBeenCalledWith(
     '/api/auth/change-initial-password',
@@ -85,7 +85,37 @@ it('sends the current and new password when changing the initial password', asyn
       body: JSON.stringify({
         currentPassword: '22520001',
         newPassword: 'matkhau123',
+        activationCode: '123456',
       }),
     }),
+  );
+});
+
+it('requests an activation code email', async () => {
+  const sent = {
+    expiresAt: '2026-10-24T08:10:00Z',
+    resendAvailableAt: '2026-10-24T08:01:00Z',
+  };
+  const fetchMock = stubFetch({
+    ok: true,
+    body: { success: true, message: '', data: sent },
+  });
+
+  await expect(authService.sendActivationCode()).resolves.toEqual(sent);
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/auth/activation-code',
+    expect.objectContaining({ method: 'POST' }),
+  );
+});
+
+it('surfaces the resend cooldown message', async () => {
+  stubFetch({
+    ok: false,
+    status: 429,
+    body: { success: false, message: 'Vui lòng đợi 42 giây' },
+  });
+
+  await expect(authService.sendActivationCode()).rejects.toThrow(
+    'Vui lòng đợi 42 giây',
   );
 });

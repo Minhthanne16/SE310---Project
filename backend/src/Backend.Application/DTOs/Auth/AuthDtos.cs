@@ -10,6 +10,13 @@ public class ChangeInitialPasswordDto
 {
     public string CurrentPassword { get; set; } = string.Empty;
     public string NewPassword { get; set; } = string.Empty;
+    public string ActivationCode { get; set; } = string.Empty;
+}
+
+public class ActivationCodeSentDto
+{
+    public DateTime ExpiresAt { get; set; }
+    public DateTime ResendAvailableAt { get; set; }
 }
 
 public class CurrentUserDto
