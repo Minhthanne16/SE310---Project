@@ -13,7 +13,8 @@ docs/
 │   ├── DOMAIN_MODEL.md
 │   └── SYSTEM_CONTEXT.md
 ├── decisions/
-│   └── PDR-001-vai-tro-va-quy-trinh-co-kiem-soat.md
+│   ├── PDR-001-vai-tro-va-quy-trinh-co-kiem-soat.md
+│   └── PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md
 ├── product/
 │   ├── GLOSSARY.md
 │   ├── ROLES.md

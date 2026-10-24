@@ -17,7 +17,19 @@ public sealed class ApiSmokeTests : IClassFixture<ApiSmokeTests.ApiFactory>
         using var client = _factory.CreateClient();
         var response = await client.GetAsync("/openapi/v1.json");
         response.EnsureSuccessStatusCode();
-        Assert.Contains("/api/Products", await response.Content.ReadAsStringAsync());
+        var document = await response.Content.ReadAsStringAsync();
+        Assert.Contains("/api/Products", document);
+        Assert.Contains("/api/Auth/login", document);
+    }
+
+    [Fact]
+    public void ApiRefusesToStartWithoutJwtSigningKey()
+    {
+        using var factory = new ApiFactory().WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Authentication:Jwt:SigningKey"] = "" })));
+
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains("SigningKey", error.ToString());
     }
 
     public sealed class ApiFactory : WebApplicationFactory<Program>
@@ -25,12 +37,7 @@ public sealed class ApiSmokeTests : IClassFixture<ApiSmokeTests.ApiFactory>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=se310_test;Username=test;Password=test",
-                ["InitializeDatabase"] = "false",
-                ["SeedSampleProducts"] = "false"
-            }));
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(TestConfiguration.Values));
         }
     }
 }

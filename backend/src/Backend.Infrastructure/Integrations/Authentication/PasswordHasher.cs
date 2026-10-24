@@ -1,10 +1,6 @@
-namespace Backend.Infrastructure.Integrations.Authentication;
+using Backend.Application.Common.Security;
 
-public interface IPasswordHasher
-{
-    string Hash(string password);
-    bool Verify(string password, string hash);
-}
+namespace Backend.Infrastructure.Integrations.Authentication;
 
 public sealed class PasswordHasher : IPasswordHasher
 {
