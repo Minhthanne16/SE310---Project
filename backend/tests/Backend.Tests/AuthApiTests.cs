@@ -56,6 +56,16 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
     }
 
     [Fact]
+    public async Task LoginWithUnknownEmailReturns401WithSameMessage()
+    {
+        var response = await Client().PostAsJsonAsync("/api/auth/login",
+            new { email = $"khong.ton.tai.{Guid.NewGuid():N}@truong.edu.vn", password = "matkhau123" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(LoginHandler.InvalidCredentialsMessage, (await ReadJson(response)).GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task ProtectedEndpointWithoutCookieReturns401ApiResponse()
     {
         var response = await Client().GetAsync("/api/auth/me");
@@ -183,6 +193,88 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var setCookie = Assert.Single(response.Headers.GetValues("Set-Cookie"), c => c.StartsWith($"{CookieName}="));
         Assert.Contains("expires=Thu, 01 Jan 1970", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private const string ImportCsv = "user_code,full_name,email,role,class_name,department\n" +
+                                     "{0},Nguyễn Văn An,{1},Student,KTPM2022,\n" +
+                                     "{2},,thieu.ten@truong.edu.vn,Student,KTPM2022,\n";
+
+    [Theory]
+    [InlineData(UserRole.Student)]
+    [InlineData(UserRole.Lecturer)]
+    public async Task OnlyAcademicAffairsCanImportUsers(UserRole role)
+    {
+        var cookie = await LoginCookie(_factory.AddUser(role, "matkhau123", mustChange: false), "matkhau123");
+
+        var response = await Upload("/api/users/import/preview", cookie, Csv(out _, out _), "ds.csv");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PreviewReturnsReportWithoutCreatingAccounts()
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.AcademicAffairs, "matkhau123", mustChange: false), "matkhau123");
+
+        var response = await Upload("/api/users/import/preview", cookie, Csv(out var code, out var email), "ds.csv");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var data = (await ReadJson(response)).GetProperty("data");
+        Assert.Equal(2, data.GetProperty("totalRows").GetInt32());
+        Assert.Equal(1, data.GetProperty("validRows").GetInt32());
+        Assert.Equal(0, data.GetProperty("importedRows").GetInt32());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Client().PostAsJsonAsync("/api/auth/login", new { email, password = code })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ImportedAccountCanLogInWithUserCodeAndMustActivate()
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.AcademicAffairs, "matkhau123", mustChange: false), "matkhau123");
+
+        var response = await Upload("/api/users/import", cookie, Csv(out var code, out var email), "ds.csv");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var data = (await ReadJson(response)).GetProperty("data");
+        Assert.Equal(1, data.GetProperty("importedRows").GetInt32());
+        Assert.Equal(1, data.GetProperty("errorRows").GetInt32());
+
+        var login = await Client().PostAsJsonAsync("/api/auth/login", new { email, password = code });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        Assert.True((await ReadJson(login)).GetProperty("data").GetProperty("mustChangePassword").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("ds.xlsx")]
+    [InlineData(null)]
+    public async Task ImportRejectsMissingOrNonCsvFile(string? fileName)
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.AcademicAffairs, "matkhau123", mustChange: false), "matkhau123");
+
+        var response = await Upload("/api/users/import/preview", cookie, Csv(out _, out _), fileName);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False((await ReadJson(response)).GetProperty("success").GetBoolean());
+    }
+
+    private static string Csv(out string code, out string email)
+    {
+        var id = Guid.NewGuid().ToString("N")[..10];
+        code = $"SV{id}";
+        email = $"sv{id}@truong.edu.vn";
+        return string.Format(ImportCsv, code, email, $"SX{id}");
+    }
+
+    private async Task<HttpResponseMessage> Upload(string url, string cookie, string csv, string? fileName)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Headers.Add("Cookie", $"{CookieName}={cookie}");
+        var form = new MultipartFormDataContent();
+        if (fileName is not null)
+            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(csv)), "file", fileName);
+        else
+            form.Add(new StringContent("x"), "note");
+        request.Content = form;
+        return await Client().SendAsync(request);
     }
 
     private HttpClient Client() => _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });

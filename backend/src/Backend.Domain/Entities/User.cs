@@ -18,6 +18,11 @@ public class User : BaseEntity
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    // Sinh viên: lớp. Giảng viên: bộ môn và học hàm/học vị.
+    public string? ClassName { get; set; }
+    public string? Department { get; set; }
+    public string? AcademicTitle { get; set; }
     public bool IsActive { get; set; } = true;
     public bool MustChangePassword { get; set; } = true;
     // Đổi giá trị khi đổi mật khẩu để vô hiệu hóa các token đã cấp trước đó.

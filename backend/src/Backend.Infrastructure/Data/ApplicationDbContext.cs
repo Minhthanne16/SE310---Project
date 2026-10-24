@@ -34,6 +34,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
             entity.Property(e => e.ActivationCodeHash).HasMaxLength(100);
+            entity.Property(e => e.ClassName).HasMaxLength(100);
+            entity.Property(e => e.Department).HasMaxLength(100);
+            entity.Property(e => e.AcademicTitle).HasMaxLength(100);
             entity.HasIndex(e => e.UserCode).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
         });

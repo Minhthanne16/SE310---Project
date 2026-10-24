@@ -284,12 +284,6 @@ public sealed class AuthWorkflowTests
         _sender.Send(new ChangeInitialPasswordCommand(user.Id,
             new ChangeInitialPasswordDto { CurrentPassword = current, NewPassword = newPassword, ActivationCode = code }));
 
-    private sealed class FakePasswordHasher : IPasswordHasher
-    {
-        public string Hash(string password) => $"hash:{password}";
-        public bool Verify(string password, string hash) => hash == $"hash:{password}";
-    }
-
     private sealed class FakeTokenIssuer : IAccessTokenIssuer
     {
         public IssuedAccessToken Issue(User user) => new($"token-for-{user.Id}", DateTime.UtcNow.AddHours(1));
@@ -325,7 +319,40 @@ internal sealed class InMemoryUserRepository : IUserRepository
         lock (_users) return Task.FromResult(_users.Values.FirstOrDefault(u => u.Email == normalizedEmail));
     }
 
+    public Task<IReadOnlySet<string>> GetExistingUserCodesAsync(IReadOnlyCollection<string> userCodes, CancellationToken cancellationToken = default)
+    {
+        lock (_users) return Task.FromResult<IReadOnlySet<string>>(_users.Values.Select(u => u.UserCode).Where(userCodes.Contains).ToHashSet());
+    }
+
+    public Task<IReadOnlySet<string>> GetExistingEmailsAsync(IReadOnlyCollection<string> normalizedEmails, CancellationToken cancellationToken = default)
+    {
+        lock (_users) return Task.FromResult<IReadOnlySet<string>>(_users.Values.Select(u => u.Email).Where(normalizedEmails.Contains).ToHashSet());
+    }
+
+    public Task AddRangeAsync(IReadOnlyCollection<User> users, CancellationToken cancellationToken = default)
+    {
+        lock (_users)
+        {
+            if (users.Any(n => _users.Values.Any(u => u.UserCode == n.UserCode || u.Email == n.Email)))
+                throw new DuplicateUserException();
+            foreach (var user in users) _users.Add(user.Id, user);
+        }
+        return Task.CompletedTask;
+    }
+
+    public IReadOnlyList<User> All()
+    {
+        lock (_users) return _users.Values.ToList();
+    }
+
     public Task UpdateAsync(User user, CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+internal sealed class FakePasswordHasher : IPasswordHasher
+{
+    public string Hash(string password) => $"hash:{password}";
+    public string HashInitialPassword(string userCode) => $"hash:{userCode}";
+    public bool Verify(string password, string hash) => hash == $"hash:{password}";
 }
 
 internal sealed class CapturingEmailSender : IEmailSender
