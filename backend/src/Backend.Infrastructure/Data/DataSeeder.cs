@@ -1,3 +1,4 @@
+using Backend.Application.Common.Security;
 using Backend.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -43,5 +44,31 @@ public static class DataSeeder
             await context.Products.AddRangeAsync(sampleProducts);
             await context.SaveChangesAsync();
         }
+    }
+
+    // Chỉ dùng cho database phát triển local. Mật khẩu ban đầu là mã người dùng và
+    // bắt đổi ở lần đăng nhập đầu, giống tài khoản do Giáo vụ tạo.
+    public static async Task SeedDevelopmentUsersAsync(IServiceProvider serviceProvider)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        if (context.Users.Any()) return;
+
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        User Create(string code, string fullName, string email, UserRole role) => new()
+        {
+            UserCode = code,
+            FullName = fullName,
+            Email = User.NormalizeEmail(email),
+            PasswordHash = hasher.Hash(code),
+            Role = role,
+            MustChangePassword = true
+        };
+
+        await context.Users.AddRangeAsync(
+            Create("22520001", "Nguyễn Văn An", "sv.22520001@qlkltn.local", UserRole.Student),
+            Create("GV0001", "Trần Thị Bình", "gv.0001@qlkltn.local", UserRole.Lecturer),
+            Create("GVU0001", "Lê Văn Cường", "giaovu.0001@qlkltn.local", UserRole.AcademicAffairs));
+        await context.SaveChangesAsync();
     }
 }

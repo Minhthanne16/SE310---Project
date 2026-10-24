@@ -12,6 +12,10 @@ services:
       FrontendOrigin: http://localhost:3000
       InitializeDatabase: "false"
       SeedSampleProducts: "false"
+      SeedDevelopmentUsers: "false"
+      Authentication__Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (at least 32 bytes)}
+      Authentication__Jwt__Issuer: se310-api
+      Authentication__Jwt__Audience: se310-web
     ports:
       - "127.0.0.1:5290:8080"
 

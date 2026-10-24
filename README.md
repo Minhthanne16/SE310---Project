@@ -35,7 +35,9 @@ compose.yaml
 .github/workflows/             CI và publish GHCR theo lệnh thủ công
 ```
 
-CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Tích hợp Redis, MinIO, SMTP, JWT/Google và BCrypt đã có package, cấu hình và adapter cơ bản; repo **chưa có** endpoint đăng nhập, refresh-token rotation, gửi email hoặc upload file. Các luồng đó cần được xây khi có yêu cầu nghiệp vụ cụ thể.
+CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Đã có API đăng nhập cục bộ (`/api/auth/login`, `me`, `change-initial-password`, `logout`): JWT nằm trong cookie HttpOnly, phân quyền theo ba vai trò `Student`, `Lecturer`, `AcademicAffairs`, mật khẩu băm bằng BCrypt. Xem [PDR-002](docs/decisions/PDR-002-xac-thuc-va-lo-trinh-ma-nguon.md). Redis, MinIO, SMTP và Google đã có package, cấu hình và adapter cơ bản; repo **chưa có** refresh token, gửi email hoặc upload file.
+
+API bắt buộc có `Authentication__Jwt__SigningKey` (tối thiểu 32 byte, ví dụ `openssl rand -base64 48`), nếu thiếu sẽ không khởi động. Với Compose, đặt `JWT_SIGNING_KEY` trong `.env`.
 
 ## Chạy bằng Docker Compose
 
@@ -43,7 +45,7 @@ CRUD sản phẩm chạy qua MediatR và EF Core PostgreSQL. Tích hợp Redis, 
 2. Chạy `docker compose up --build` tại thư mục gốc.
 3. Mở frontend tại <http://localhost:3000>, API tại <http://localhost:5290>, Scalar tại <http://localhost:5290/scalar> và MinIO Console tại <http://localhost:9001>.
 
-Compose tự chạy migration và seed ba sản phẩm mẫu. Volume PostgreSQL, Redis và MinIO giữ dữ liệu giữa các lần khởi động.
+Compose tự chạy migration, seed ba sản phẩm mẫu và ba tài khoản thử. Mật khẩu ban đầu của mỗi tài khoản là mã người dùng, phải đổi ở lần đăng nhập đầu: `sv.22520001@qlkltn.local` (22520001, Sinh viên), `gv.0001@qlkltn.local` (GV0001, Giảng viên), `giaovu.0001@qlkltn.local` (GVU0001, Giáo vụ). Volume PostgreSQL, Redis và MinIO giữ dữ liệu giữa các lần khởi động.
 
 ### Dùng Neon thay PostgreSQL local
 

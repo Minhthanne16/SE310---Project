@@ -10,6 +10,7 @@ afterEach(cleanup);
 const fakeAuth = (result: 'success' | 'mustChangePassword'): AuthService => ({
   login: vi.fn().mockResolvedValue(result),
   changeInitialPassword: vi.fn().mockResolvedValue(undefined),
+  logout: vi.fn().mockResolvedValue(undefined),
 });
 
 it('shows an error when email or password is empty', () => {
@@ -49,7 +50,24 @@ it('asks for a new password on first login and enables submit once rules pass', 
   fireEvent.click(submit);
   await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalled());
   expect(auth.changeInitialPassword).toHaveBeenCalledWith(
-    'an.nv@truong.edu.vn',
+    '22520001',
     'matkhau123',
   );
+});
+
+it('clears the session when the user logs out from the change-password step', async () => {
+  const auth = fakeAuth('mustChangePassword');
+  render(<LoginPage authService={auth} />);
+
+  fireEvent.change(screen.getByLabelText('Email'), {
+    target: { value: 'an.nv@truong.edu.vn' },
+  });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), {
+    target: { value: '22520001' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất' }));
+
+  await screen.findByRole('button', { name: 'Đăng nhập' });
+  expect(auth.logout).toHaveBeenCalled();
 });

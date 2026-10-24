@@ -47,7 +47,7 @@ services:
       Storage__AccessKey: ${MINIO_ROOT_USER}
       Storage__SecretKey: ${MINIO_ROOT_PASSWORD}
       Storage__Bucket: products
-      Authentication__Jwt__SigningKey: ${JWT_SIGNING_KEY:-}
+      Authentication__Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (at least 32 bytes)}
       Authentication__Jwt__Issuer: se310-api
       Authentication__Jwt__Audience: se310-web
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
@@ -59,6 +59,7 @@ services:
       FrontendOrigin: http://localhost:3000
       InitializeDatabase: "true"
       SeedSampleProducts: "true"
+      SeedDevelopmentUsers: "true"
     depends_on:
       db:
         condition: service_healthy

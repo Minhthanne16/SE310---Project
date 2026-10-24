@@ -7,6 +7,7 @@ Hướng dẫn này dành cho repo hiện tại: frontend Next.js gọi `/api/*`
 - Neon project: `se310-project` (`lucky-dream-62992773`) trong tổ chức **Minh Thân**.
 - Vùng: `aws-ap-southeast-1` (Singapore). Branch đang liên kết: `main` trong file `.neon` local.
 - Migration `20261020143314_InitialCreate` đã áp dụng. Bảng `Products` hiện trống; API `GET /api/products` đã trả về thành công từ Neon.
+- Migration `20261024044840_AddUsers` (thêm bảng `Users` cho đăng nhập) **chưa** áp dụng lên Neon. Chỉ thêm bảng, không đổi `Products`. Xem SQL bằng `dotnet tool run dotnet-ef migrations script 20261020143314_InitialCreate AddUsers --project src/Backend.Infrastructure --startup-project src/Backend.API`, rồi áp dụng có chủ đích theo mục 4, nên thử trên branch Neon riêng trước. Không bật `SeedDevelopmentUsers` trên Neon.
 - Chuỗi kết nối pooled cho Docker được lưu trong `.env` local và đã được gitignore. Nếu clone repo sang máy khác, tạo lại file này từ `.env.example` rồi điền chuỗi từ Neon Console; không commit secret.
 
 Các bước tạo project và chạy migration bên dưới dành cho trường hợp muốn thiết lập lại ở project/branch khác. Đừng chạy lại quy trình tạo project nếu bạn tiếp tục dùng project trên.

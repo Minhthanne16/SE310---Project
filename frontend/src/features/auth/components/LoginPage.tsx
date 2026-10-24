@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Circle } from 'lucide-react';
 import { getNewPasswordRules } from '@/features/auth/passwordRules';
 import {
-  demoAuthService,
+  authService as defaultAuthService,
   type AuthService,
 } from '@/features/auth/services/authService';
 
@@ -18,7 +18,7 @@ interface LoginPageProps {
 type Step = 'login' | 'changePassword';
 
 export const LoginPage: React.FC<LoginPageProps> = ({
-  authService = demoAuthService,
+  authService = defaultAuthService,
   onAuthenticated,
 }) => {
   const router = useRouter();
@@ -65,7 +65,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       setLoading(true);
       setError(null);
-      await authService.changeInitialPassword(email.trim(), newPassword);
+      await authService.changeInitialPassword(password, newPassword);
       finish();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại');
@@ -74,7 +74,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Cookie hết hạn theo thời gian sống của token nếu không gọi được API.
+    }
     setStep('login');
     setPassword('');
     setError(null);

@@ -1,25 +1,40 @@
-import { isValidPassword } from '@/features/auth/passwordRules';
+import { apiRequest } from '@/api/request';
+import type { CurrentUser } from '@/types/auth';
 
 export type LoginResult = 'success' | 'mustChangePassword';
 
 export interface AuthService {
   login(email: string, password: string): Promise<LoginResult>;
-  changeInitialPassword(email: string, newPassword: string): Promise<void>;
+  changeInitialPassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void>;
+  logout(): Promise<void>;
 }
 
-// Backend chưa có endpoint xác thực (xem README). Bản demo này mô phỏng luồng
-// trên giao diện mẫu để dựng màn hình; thay bằng lời gọi apiRequest khi có API.
-// - Mật khẩu toàn số (mã người dùng) => lần đăng nhập đầu, bắt đổi mật khẩu.
-// - Mật khẩu hợp lệ (>= 8 ký tự, có chữ và số) => đăng nhập thành công.
-export const demoAuthService: AuthService = {
+// Phiên đăng nhập là JWT trong cookie HttpOnly do backend đặt; frontend không
+// đọc hay lưu token, trình duyệt tự gửi cookie qua proxy /api cùng origin.
+export const authService: AuthService = {
   async login(email, password) {
-    if (/^[0-9]{6,}$/.test(password)) return 'mustChangePassword';
-    if (!email.includes('@') || !isValidPassword(password)) {
-      throw new Error(
-        'Email hoặc mật khẩu không đúng. Kiểm tra lại hoặc dùng Quên mật khẩu.',
-      );
-    }
-    return 'success';
+    const user = await apiRequest<CurrentUser>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    return user.mustChangePassword ? 'mustChangePassword' : 'success';
   },
-  async changeInitialPassword() {},
+
+  async changeInitialPassword(currentPassword, newPassword) {
+    await apiRequest<CurrentUser>('/auth/change-initial-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
+
+  async logout() {
+    await apiRequest<boolean>('/auth/logout', { method: 'POST' });
+  },
 };
+
+export function getCurrentUser(): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>('/auth/me');
+}
