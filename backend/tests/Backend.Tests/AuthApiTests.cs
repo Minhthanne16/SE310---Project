@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Backend.Application.Auth;
+using Backend.Application.Common.Email;
 using Backend.Domain.Entities;
 using Backend.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -97,8 +98,12 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await Send(HttpMethod.Get, "/api/test-rbac/student", initialCookie)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Send(HttpMethod.Get, "/api/test-rbac/any", initialCookie)).StatusCode);
 
+        var sendCode = await Send(HttpMethod.Post, "/api/auth/activation-code", initialCookie);
+        Assert.Equal(HttpStatusCode.OK, sendCode.StatusCode);
+        Assert.Contains(_factory.Emails.Sent, m => m.To == email && m.Text.Contains(AuthApiFactory.Code));
+
         var change = await Send(HttpMethod.Post, "/api/auth/change-initial-password", initialCookie,
-            new { currentPassword = "22520001", newPassword = "matkhau123" });
+            new { currentPassword = "22520001", newPassword = "matkhau123", activationCode = AuthApiFactory.Code });
         Assert.Equal(HttpStatusCode.OK, change.StatusCode);
         var newCookie = CookieValue(change);
 
@@ -113,10 +118,50 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
         var email = _factory.AddUser(UserRole.Student, "22520001", mustChange: true, code: "22520001");
         var cookie = await LoginCookie(email, "22520001");
 
+        await Send(HttpMethod.Post, "/api/auth/activation-code", cookie);
+
         var response = await Send(HttpMethod.Post, "/api/auth/change-initial-password", cookie,
-            new { currentPassword = "sai12345", newPassword = "matkhau123" });
+            new { currentPassword = "sai12345", newPassword = "matkhau123", activationCode = AuthApiFactory.Code });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False((await ReadJson(response)).GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ResendingActivationCodeTooSoonReturns429()
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.Student, "22520001", mustChange: true, code: "22520001"), "22520001");
+
+        var first = await Send(HttpMethod.Post, "/api/auth/activation-code", cookie);
+        var second = await Send(HttpMethod.Post, "/api/auth/activation-code", cookie);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var data = (await ReadJson(first)).GetProperty("data");
+        Assert.True(data.TryGetProperty("expiresAt", out _));
+        Assert.True(data.TryGetProperty("resendAvailableAt", out _));
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.False((await ReadJson(second)).GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ActivationCodeForActivatedAccountReturns400()
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.Student, "matkhau123", mustChange: false), "matkhau123");
+
+        var response = await Send(HttpMethod.Post, "/api/auth/activation-code", cookie);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ActivationCodeEmailFailureReturns503()
+    {
+        var cookie = await LoginCookie(_factory.AddUser(UserRole.Student, "22520001", mustChange: true, code: "22520001"), "22520001");
+        _factory.Emails.FailNext = true;
+
+        var response = await Send(HttpMethod.Post, "/api/auth/activation-code", cookie);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.False((await ReadJson(response)).GetProperty("success").GetBoolean());
     }
 
@@ -168,7 +213,9 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
 
     public sealed class AuthApiFactory : WebApplicationFactory<Program>
     {
+        public const string Code = "246810";
         public TestUserStore Users { get; } = new();
+        internal CapturingEmailSender Emails { get; } = new();
 
         public string AddUser(UserRole role, string password, bool mustChange, string? code = null) =>
             Users.Add(role, password, mustChange, code);
@@ -181,6 +228,10 @@ public sealed class AuthApiTests : IClassFixture<AuthApiTests.AuthApiFactory>
             {
                 services.RemoveAll<IUserRepository>();
                 services.AddSingleton<IUserRepository>(Users.Repository);
+                services.RemoveAll<IEmailSender>();
+                services.AddSingleton<IEmailSender>(Emails);
+                services.RemoveAll<IActivationCodeGenerator>();
+                services.AddSingleton<IActivationCodeGenerator>(new FixedCodeGenerator(Code));
                 services.AddControllers().AddApplicationPart(typeof(RbacProbeController).Assembly);
             });
         }

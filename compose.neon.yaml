@@ -16,6 +16,12 @@ services:
       Authentication__Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (at least 32 bytes)}
       Authentication__Jwt__Issuer: se310-api
       Authentication__Jwt__Audience: se310-web
+      Email__Host: ${SMTP_HOST:-}
+      Email__Port: ${SMTP_PORT:-587}
+      Email__UseStartTls: ${SMTP_USE_STARTTLS:-true}
+      Email__Username: ${SMTP_USER:-}
+      Email__Password: ${SMTP_PASSWORD:-}
+      Email__From: ${SMTP_FROM:-}
     ports:
       - "127.0.0.1:5290:8080"
 

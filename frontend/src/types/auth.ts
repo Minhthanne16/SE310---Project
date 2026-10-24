@@ -8,3 +8,8 @@ export interface CurrentUser {
   role: UserRole;
   mustChangePassword: boolean;
 }
+
+export interface ActivationCodeSent {
+  expiresAt: string;
+  resendAvailableAt: string;
+}

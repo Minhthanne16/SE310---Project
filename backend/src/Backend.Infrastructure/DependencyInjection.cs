@@ -1,3 +1,4 @@
+using Backend.Application.Common.Email;
 using Backend.Application.Common.Security;
 using Backend.Domain.Interfaces;
 using Backend.Infrastructure.Data;

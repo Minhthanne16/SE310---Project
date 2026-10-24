@@ -1,5 +1,6 @@
 using Backend.Application;
 using Backend.Application.Auth;
+using Backend.Application.Common.Email;
 using Backend.Application.Common.Security;
 using Backend.Application.DTOs.Auth;
 using Backend.Domain.Entities;
@@ -13,7 +14,10 @@ namespace Backend.Tests;
 
 public sealed class AuthWorkflowTests
 {
+    private const string Code = "123456";
     private readonly InMemoryUserRepository _users = new();
+    private readonly CapturingEmailSender _emails = new();
+    private readonly ManualTimeProvider _clock = new(new DateTimeOffset(2026, 10, 24, 8, 0, 0, TimeSpan.Zero));
     private readonly ISender _sender;
 
     public AuthWorkflowTests()
@@ -24,6 +28,9 @@ public sealed class AuthWorkflowTests
         services.AddSingleton<IUserRepository>(_users);
         services.AddSingleton<IPasswordHasher, FakePasswordHasher>();
         services.AddSingleton<IAccessTokenIssuer, FakeTokenIssuer>();
+        services.AddSingleton<IEmailSender>(_emails);
+        services.AddSingleton<IActivationCodeGenerator>(new FixedCodeGenerator(Code));
+        services.AddSingleton<TimeProvider>(_clock);
         _sender = services.BuildServiceProvider().GetRequiredService<ISender>();
     }
 
@@ -86,28 +93,137 @@ public sealed class AuthWorkflowTests
     }
 
     [Fact]
-    public async Task ChangeInitialPasswordClearsFlagAndRotatesSecurityStamp()
+    public async Task SendActivationCodeEmailsHashedCodeToAccountEmail()
     {
-        var user = _users.Add("22520001", "an.nv@truong.edu.vn", "22520001", UserRole.Student, mustChange: true);
+        var user = NewStudentWithInitialPassword();
+
+        var result = await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        Assert.Equal(SendActivationCodeStatus.Sent, result.Status);
+        var email = Assert.Single(_emails.Sent);
+        Assert.Equal(user.Email, email.To);
+        Assert.Contains(Code, email.Text);
+        Assert.Equal($"hash:{Code}", user.ActivationCodeHash);
+        Assert.Equal(_clock.GetUtcNow().UtcDateTime.AddMinutes(10), user.ActivationCodeExpiresAt);
+        Assert.Equal(_clock.GetUtcNow().UtcDateTime.AddSeconds(60), result.Response.Data!.ResendAvailableAt);
+    }
+
+    [Fact]
+    public async Task SendActivationCodeEnforcesResendCooldown()
+    {
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        var tooSoon = await _sender.Send(new SendActivationCodeCommand(user.Id));
+        _clock.Advance(TimeSpan.FromSeconds(61));
+        var later = await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        Assert.Equal(SendActivationCodeStatus.TooSoon, tooSoon.Status);
+        Assert.Equal(SendActivationCodeStatus.Sent, later.Status);
+        Assert.Equal(2, _emails.Sent.Count);
+    }
+
+    [Fact]
+    public async Task SendActivationCodeIsNotForActivatedAccounts()
+    {
+        var user = _users.Add("22520001", "an.nv@truong.edu.vn", "matkhau123", UserRole.Student, mustChange: false);
+
+        var result = await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        Assert.Equal(SendActivationCodeStatus.NotRequired, result.Status);
+        Assert.Empty(_emails.Sent);
+    }
+
+    [Fact]
+    public async Task SendActivationCodeDeliveryFailureDiscardsCodeAndAllowsImmediateRetry()
+    {
+        var user = NewStudentWithInitialPassword();
+        _emails.FailNext = true;
+
+        var failed = await _sender.Send(new SendActivationCodeCommand(user.Id));
+        var retry = await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        Assert.Equal(SendActivationCodeStatus.DeliveryFailed, failed.Status);
+        Assert.Equal(SendActivationCodeStatus.Sent, retry.Status);
+    }
+
+    [Fact]
+    public async Task ChangeInitialPasswordClearsFlagCodeAndRotatesSecurityStamp()
+    {
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
         var oldStamp = user.SecurityStamp;
 
-        var result = await _sender.Send(new ChangeInitialPasswordCommand(user.Id,
-            new ChangeInitialPasswordDto { CurrentPassword = "22520001", NewPassword = "matkhau123" }));
+        var result = await ChangePassword(user, "22520001", "matkhau123", Code);
 
         Assert.True(result.Success);
         Assert.False(result.Data!.User.MustChangePassword);
         Assert.False(user.MustChangePassword);
         Assert.NotEqual(oldStamp, user.SecurityStamp);
         Assert.Equal("hash:matkhau123", user.PasswordHash);
+        Assert.Null(user.ActivationCodeHash);
     }
 
     [Fact]
     public async Task ChangeInitialPasswordRejectsWrongCurrentPassword()
     {
-        var user = _users.Add("22520001", "an.nv@truong.edu.vn", "22520001", UserRole.Student, mustChange: true);
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
 
-        var result = await _sender.Send(new ChangeInitialPasswordCommand(user.Id,
-            new ChangeInitialPasswordDto { CurrentPassword = "sai", NewPassword = "matkhau123" }));
+        var result = await ChangePassword(user, "sai", "matkhau123", Code);
+
+        Assert.False(result.Success);
+        Assert.True(user.MustChangePassword);
+        Assert.Equal(0, user.ActivationCodeFailedAttempts);
+    }
+
+    [Fact]
+    public async Task ChangeInitialPasswordRequiresACodeToHaveBeenSent()
+    {
+        var user = NewStudentWithInitialPassword();
+
+        var result = await ChangePassword(user, "22520001", "matkhau123", Code);
+
+        Assert.False(result.Success);
+        Assert.True(user.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task ChangeInitialPasswordRejectsWrongCodeAndCountsAttempts()
+    {
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
+
+        var result = await ChangePassword(user, "22520001", "matkhau123", "000000");
+
+        Assert.False(result.Success);
+        Assert.Equal(1, user.ActivationCodeFailedAttempts);
+        Assert.True(user.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task FifthWrongCodeInvalidatesTheCode()
+    {
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
+        for (var i = 0; i < 5; i++)
+            await ChangePassword(user, "22520001", "matkhau123", "000000");
+
+        var result = await ChangePassword(user, "22520001", "matkhau123", Code);
+
+        Assert.False(result.Success);
+        Assert.Null(user.ActivationCodeHash);
+        Assert.True(user.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task ExpiredCodeIsRejected()
+    {
+        var user = NewStudentWithInitialPassword();
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
+        _clock.Advance(TimeSpan.FromMinutes(10).Add(TimeSpan.FromSeconds(1)));
+
+        var result = await ChangePassword(user, "22520001", "matkhau123", Code);
 
         Assert.False(result.Success);
         Assert.True(user.MustChangePassword);
@@ -117,9 +233,9 @@ public sealed class AuthWorkflowTests
     public async Task ChangeInitialPasswordRejectsUserCodeAsNewPassword()
     {
         var user = _users.Add("sv22520001", "an.nv@truong.edu.vn", "tam12345", UserRole.Student, mustChange: true);
+        await _sender.Send(new SendActivationCodeCommand(user.Id));
 
-        var result = await _sender.Send(new ChangeInitialPasswordCommand(user.Id,
-            new ChangeInitialPasswordDto { CurrentPassword = "tam12345", NewPassword = "sv22520001" }));
+        var result = await ChangePassword(user, "tam12345", "sv22520001", Code);
 
         Assert.False(result.Success);
         Assert.True(user.MustChangePassword);
@@ -130,21 +246,23 @@ public sealed class AuthWorkflowTests
     {
         var user = _users.Add("22520001", "an.nv@truong.edu.vn", "matkhau123", UserRole.Student, mustChange: false);
 
-        var result = await _sender.Send(new ChangeInitialPasswordCommand(user.Id,
-            new ChangeInitialPasswordDto { CurrentPassword = "matkhau123", NewPassword = "matkhau456" }));
+        var result = await ChangePassword(user, "matkhau123", "matkhau456", Code);
 
         Assert.False(result.Success);
     }
 
     [Theory]
-    [InlineData("abc1234")]   // ngắn hơn 8 ký tự
-    [InlineData("abcdefgh")]  // không có số
-    [InlineData("12345678")]  // không có chữ
-    [InlineData("22520001")]  // trùng mật khẩu hiện tại
-    public async Task ChangeInitialPasswordValidatesPasswordRules(string newPassword)
+    [InlineData("abc1234", Code)]    // ngắn hơn 8 ký tự
+    [InlineData("abcdefgh", Code)]   // không có số
+    [InlineData("12345678", Code)]   // không có chữ
+    [InlineData("22520001", Code)]   // trùng mật khẩu hiện tại
+    [InlineData("matkhau123", "")]   // thiếu mã xác thực
+    [InlineData("matkhau123", "12a456")]
+    [InlineData("matkhau123", "12345")]
+    public async Task ChangeInitialPasswordValidatesInput(string newPassword, string code)
     {
         await Assert.ThrowsAsync<ValidationException>(() => _sender.Send(new ChangeInitialPasswordCommand(Guid.NewGuid(),
-            new ChangeInitialPasswordDto { CurrentPassword = "22520001", NewPassword = newPassword })));
+            new ChangeInitialPasswordDto { CurrentPassword = "22520001", NewPassword = newPassword, ActivationCode = code })));
     }
 
     [Fact]
@@ -157,6 +275,14 @@ public sealed class AuthWorkflowTests
 
         Assert.False(result.Success);
     }
+
+    private User NewStudentWithInitialPassword() =>
+        _users.Add("22520001", "an.nv@truong.edu.vn", "22520001", UserRole.Student, mustChange: true);
+
+    private Task<Backend.Application.Common.ApiResponse<AuthenticatedSession>> ChangePassword(
+        User user, string current, string newPassword, string code) =>
+        _sender.Send(new ChangeInitialPasswordCommand(user.Id,
+            new ChangeInitialPasswordDto { CurrentPassword = current, NewPassword = newPassword, ActivationCode = code }));
 
     private sealed class FakePasswordHasher : IPasswordHasher
     {
@@ -185,15 +311,50 @@ internal sealed class InMemoryUserRepository : IUserRepository
             Role = role,
             MustChangePassword = mustChange
         };
-        _users.Add(user.Id, user);
+        lock (_users) _users.Add(user.Id, user);
         return user;
     }
 
-    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_users.GetValueOrDefault(id));
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        lock (_users) return Task.FromResult(_users.GetValueOrDefault(id));
+    }
 
-    public Task<User?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_users.Values.FirstOrDefault(u => u.Email == normalizedEmail));
+    public Task<User?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken = default)
+    {
+        lock (_users) return Task.FromResult(_users.Values.FirstOrDefault(u => u.Email == normalizedEmail));
+    }
 
     public Task UpdateAsync(User user, CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+internal sealed class CapturingEmailSender : IEmailSender
+{
+    public sealed record Message(string To, string Subject, string Text);
+
+    public List<Message> Sent { get; } = [];
+    public bool FailNext { get; set; }
+
+    public Task SendAsync(string to, string subject, string text, CancellationToken cancellationToken = default)
+    {
+        if (FailNext)
+        {
+            FailNext = false;
+            throw new InvalidOperationException("SMTP unavailable");
+        }
+        lock (Sent) Sent.Add(new Message(to, subject, text));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FixedCodeGenerator(string code) : IActivationCodeGenerator
+{
+    public string NewCode() => code;
+}
+
+internal sealed class ManualTimeProvider(DateTimeOffset start) : TimeProvider
+{
+    private DateTimeOffset _now = start;
+    public override DateTimeOffset GetUtcNow() => _now;
+    public void Advance(TimeSpan by) => _now += by;
 }

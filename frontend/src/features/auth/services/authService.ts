@@ -1,13 +1,15 @@
 import { apiRequest } from '@/api/request';
-import type { CurrentUser } from '@/types/auth';
+import type { ActivationCodeSent, CurrentUser } from '@/types/auth';
 
 export type LoginResult = 'success' | 'mustChangePassword';
 
 export interface AuthService {
   login(email: string, password: string): Promise<LoginResult>;
+  sendActivationCode(): Promise<ActivationCodeSent>;
   changeInitialPassword(
     currentPassword: string,
     newPassword: string,
+    activationCode: string,
   ): Promise<void>;
   logout(): Promise<void>;
 }
@@ -23,10 +25,17 @@ export const authService: AuthService = {
     return user.mustChangePassword ? 'mustChangePassword' : 'success';
   },
 
-  async changeInitialPassword(currentPassword, newPassword) {
+  // Gửi OTP kích hoạt tới email của tài khoản đang đăng nhập (lần đầu).
+  async sendActivationCode() {
+    return apiRequest<ActivationCodeSent>('/auth/activation-code', {
+      method: 'POST',
+    });
+  },
+
+  async changeInitialPassword(currentPassword, newPassword, activationCode) {
     await apiRequest<CurrentUser>('/auth/change-initial-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword, activationCode }),
     });
   },
 

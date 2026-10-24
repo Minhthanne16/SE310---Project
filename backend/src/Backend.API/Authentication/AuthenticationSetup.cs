@@ -4,6 +4,7 @@ using Backend.Application.Common;
 using Backend.Domain.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -28,7 +29,7 @@ public static class AuthenticationSetup
                 "Authentication:Jwt:Issuer and Authentication:Jwt:Audience are required.")
             .Validate(o => o.AccessTokenMinutes > 0, "Authentication:Jwt:AccessTokenMinutes must be positive.")
             .ValidateOnStart();
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();

@@ -1,4 +1,4 @@
-namespace Backend.Infrastructure.Integrations.Email;
+namespace Backend.Application.Common.Email;
 
 public interface IEmailSender
 {

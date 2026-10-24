@@ -24,5 +24,19 @@ public class User : BaseEntity
     public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public DateTime? LastLoginAt { get; set; }
 
+    // OTP kích hoạt gửi qua email ở lần đăng nhập đầu; chỉ lưu bản băm.
+    public string? ActivationCodeHash { get; set; }
+    public DateTime? ActivationCodeExpiresAt { get; set; }
+    public DateTime? ActivationCodeSentAt { get; set; }
+    public int ActivationCodeFailedAttempts { get; set; }
+
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    public void ClearActivationCode()
+    {
+        ActivationCodeHash = null;
+        ActivationCodeExpiresAt = null;
+        ActivationCodeSentAt = null;
+        ActivationCodeFailedAttempts = 0;
+    }
 }
